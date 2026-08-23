@@ -167,8 +167,8 @@ struct PetView: View {
                             .blur(radius: 1.5)
                     )
 
-                ActionEyes(action: isDragging ? .hover : runtime.action, color: actionAccent)
-                    .frame(width: settings.size * 0.42, height: settings.size * 0.12)
+                ActionEyes(action: isDragging ? .hover : runtime.action, color: eyeAccent)
+                    .frame(width: settings.size * 0.34, height: settings.size * 0.085)
                     .offset(x: settings.size * 0.035, y: -settings.size * 0.238)
                     .animation(.easeInOut(duration: 1.35), value: runtime.action)
 
@@ -237,6 +237,12 @@ struct PetView: View {
         case .play: return Color(red: 0.34, green: 0.78, blue: 0.98)
         case .sleep: return Color(red: 0.66, green: 0.62, blue: 0.86)
         }
+    }
+
+    private var eyeAccent: Color {
+        // Eyes stay calm and recognizable across actions. Motion and shape carry
+        // expression; only the chest core uses the per-action accent palette.
+        Color(red: 0.32, green: 0.78, blue: 0.96)
     }
 
     private var dragGesture: some Gesture {
@@ -455,18 +461,14 @@ private struct ActionEyes: View {
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [Color.black, Color(red: 0.015, green: 0.025, blue: 0.035), Color.black],
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                )
+            // A compact, flat patch stays fully inside the original visor and
+            // covers the baked-in source eyes without creating raised black bumps.
+            RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .fill(Color(red: 0.006, green: 0.012, blue: 0.018).opacity(0.985))
 
             expression
-                .padding(.horizontal, 10)
-                .padding(.vertical, 2)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 1)
         }
     }
 
@@ -474,15 +476,15 @@ private struct ActionEyes: View {
     private var expression: some View {
         switch action {
         case .idle:
-            ArcEyes(lift: 0.22, color: color, opacity: 0.90, lineWidth: 3.0)
+            ArcEyes(lift: 0.22, color: color, opacity: 0.97, lineWidth: 3.4)
         case .hover:
             FocusedEyes(color: color)
         case .cheer:
-            ArcEyes(lift: 0.38, color: color, opacity: 0.94, lineWidth: 3.3)
+            ArcEyes(lift: 0.38, color: color, opacity: 1.0, lineWidth: 3.7)
         case .play:
             RoundPlayEyes(color: color)
         case .sleep:
-            ArcEyes(lift: -0.08, color: color, opacity: 0.62, lineWidth: 2.2)
+            ArcEyes(lift: -0.08, color: color, opacity: 0.76, lineWidth: 2.6)
         }
     }
 }
@@ -496,7 +498,7 @@ private struct ArcEyes: View {
     var body: some View {
         EyeArcPair(lift: lift)
             .stroke(color.opacity(opacity), style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
-            .shadow(color: color.opacity(0.52), radius: 4)
+            .shadow(color: color.opacity(0.38), radius: 3)
     }
 }
 
@@ -525,8 +527,8 @@ private struct FocusedEyes: View {
 
     var body: some View {
         FocusedEyePair()
-            .stroke(color.opacity(0.88), style: StrokeStyle(lineWidth: 3, lineCap: .round))
-            .shadow(color: color.opacity(0.50), radius: 4)
+            .stroke(color.opacity(0.96), style: StrokeStyle(lineWidth: 3.4, lineCap: .round))
+            .shadow(color: color.opacity(0.36), radius: 3)
     }
 }
 
@@ -555,14 +557,14 @@ private struct RoundPlayEyes: View {
         Circle()
             .fill(
                 RadialGradient(
-                    colors: [.white.opacity(0.95), color.opacity(0.80), color.opacity(0.35)],
+                    colors: [.white, color.opacity(0.94), color.opacity(0.48)],
                     center: .topLeading,
                     startRadius: 0,
                     endRadius: 11
                 )
             )
-            .frame(width: 15, height: 19)
-            .shadow(color: color.opacity(0.48), radius: 5)
+            .frame(width: 16, height: 20)
+            .shadow(color: color.opacity(0.38), radius: 3.5)
     }
 }
 
