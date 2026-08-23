@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 384" role="img" aria-label="Eva play rocket reference">
+  <defs><linearGradient id="flame" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#57C7FA" stop-opacity=".9"/><stop offset="1" stop-color="#57C7FA" stop-opacity="0"/></linearGradient></defs>
+  <path d="M76 300 34 338l55-10M180 300l42 38-55-10" fill="#fff" stroke="#d9dde0" stroke-width="3"/>
+  <rect x="72" y="28" width="112" height="292" rx="56" fill="#fff" stroke="#d9dde0" stroke-width="4"/>
+  <rect x="88" y="100" width="80" height="48" rx="24" fill="#05090D"/>
+  <rect x="104" y="120" width="20" height="8" rx="4" fill="#57C7FA"/><rect x="132" y="120" width="20" height="8" rx="4" fill="#57C7FA"/>
+  <rect x="90" y="230" width="76" height="7" rx="3.5" fill="#57C7FA"/>
+  <path d="M108 320h40l-7 62h-26Z" fill="url(#flame)"/>
+</svg>
