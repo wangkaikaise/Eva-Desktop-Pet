@@ -1,4 +1,4 @@
-# 伊娃桌面宠物 · Mac 2.0.2
+# 伊娃桌面宠物 · Mac 2.0.3
 
 <table align="center">
   <tr>
@@ -10,7 +10,7 @@
       <img src="Sources/EvaDesktopPet/Resources/eva-glass-v11-icon-1024.png" width="220" alt="伊娃桌面宠物应用图标">
     </td>
     <td align="center" valign="middle">
-      <img src="docs/images/eva-mac-2.0.2-hero.png" width="360" alt="伊娃桌面宠物 Mac 2.0.2 高清透明切图">
+      <img src="docs/images/eva-mac-2.0.2-hero.png" width="360" alt="伊娃桌面宠物 Mac 2.0.3 高清透明切图">
     </td>
   </tr>
 </table>
@@ -28,7 +28,7 @@
 
 伊娃以白色机身、黑色面屏和蓝色柔光构成简洁的三色形象，悬浮在桌面上陪伴工作。她拥有连续动作、表情反馈、拖动与点击互动、性能信息卡片、玻璃光效和日常提醒，并通过原生菜单栏提供快速控制。
 
-> [下载最新版 Mac 2.0.2](https://github.com/wangkaikaise/Eva-Desktop-Pet/releases/latest) · 下载 ZIP，解压后将应用拖入“应用程序”文件夹。
+> [下载最新版 Mac 2.0.3](https://github.com/wangkaikaise/Eva-Desktop-Pet/releases/latest) · 下载 ZIP，解压后将应用拖入“应用程序”文件夹。
 
 ## 核心功能
 
@@ -100,12 +100,14 @@
 | UserDefaults | 本地偏好与提醒配置持久化 |
 | Swift Package Manager | 依赖、构建、测试与工程组织 |
 
-## Mac 2.0.2 当前版本说明
+## Mac 2.0.3 当前版本说明
 
 - 完成五状态统一动作与动态眼睛系统，动作切换更连贯、持续时间更自然
 - 修复拖动卡顿，普通状态和小火箭玩耍状态均可跟手移动
 - 优化脸部动态眼睛遮罩，移除黑色圆柱与凸起，保持完整面屏轮廓
-- 眼睛线条略微加粗并提高亮度，以清晰浅蓝保持动作辨识度
+- 眼睛只做适度加粗和轻微加长，以清晰浅蓝保持动作辨识度
+- 小火箭与标准角色采用互斥渲染，彻底移除进入和退出玩耍时的原图闪现
+- 玩耍粒子随状态立即结束，不再在眼睛周围留下点状残影
 - 胸前统一为居中的单个圆形核心，并以低饱和柔光随动作变化
 - 性能卡片支持四向标准位置、完全透明背景、字体、颜色和透明度设置
 - 休眠提示、玻璃防护罩、悬浮光池和菜单栏头像完成统一设计
