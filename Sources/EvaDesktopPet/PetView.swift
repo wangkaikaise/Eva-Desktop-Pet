@@ -56,7 +56,8 @@ struct PetView: View {
                     PlaySparkles(phase: phase, color: actionAccent)
                         .frame(width: settings.size * 0.80, height: settings.size * 0.80)
                         .offset(y: 43)
-                        .transition(.scale.combined(with: .opacity))
+                        .transition(.identity)
+                        .animation(nil, value: runtime.action == .play)
                 }
 
                 if runtime.action == .sleep && !isDragging {
@@ -151,59 +152,63 @@ struct PetView: View {
                 .fill(Color.black.opacity(PetInteractionSpec.hitLayerOpacity))
                 .contentShape(Rectangle())
 
-            ZStack {
-                Image(nsImage: RobotAsset.image(named: spriteName))
-                    .resizable()
-                    .scaledToFit()
-
-                Image(nsImage: RobotAsset.image(named: spriteName))
-                    .resizable()
-                    .scaledToFit()
-                    .scaleEffect(x: -1, y: 1)
-                    .mask(
-                        Capsule()
-                            .frame(width: settings.size * 0.095, height: settings.size * 0.20)
-                            .offset(x: settings.size * 0.060, y: settings.size * 0.045)
-                            .blur(radius: 1.5)
-                    )
-
-                ActionEyes(action: isDragging ? .hover : runtime.action, color: eyeAccent)
-                    .frame(width: settings.size * 0.34, height: settings.size * 0.085)
-                    .offset(x: settings.size * 0.035, y: -settings.size * 0.238)
-                    .animation(.easeInOut(duration: 1.35), value: runtime.action)
-
-                Circle()
-                    .fill(
-                        RadialGradient(
-                            colors: [.white.opacity(0.94), actionAccent.opacity(0.72), actionAccent.opacity(0.34)],
-                            center: .center,
-                            startRadius: 0,
-                            endRadius: settings.size * 0.032
-                        )
-                    )
-                    .frame(width: settings.size * 0.058, height: settings.size * 0.058)
-                    .overlay(Circle().stroke(.white.opacity(0.72), lineWidth: 0.8))
-                    .shadow(color: actionAccent.opacity(0.38), radius: isDragging ? 12 : 9)
-                    .scaleEffect(1 + sin(phase * (isDragging ? 1.4 : 0.22)) * 0.065)
-                    .offset(
-                        x: settings.size * PetMotionSpec.chestCoreNormalizedX,
-                        y: settings.size * PetMotionSpec.chestCoreNormalizedY
-                    )
-                    .animation(.easeInOut(duration: 1.8), value: runtime.action)
-            }
-            .opacity(isRocketMode ? 0 : 1)
-            .scaleEffect(isRocketMode ? 0.62 : 1)
-
-            PlayRocket(
-                phase: playPhase,
-                color: actionAccent,
-                isDragging: isDragging,
-                dragDirection: dragDirection
-            )
+            if isRocketMode {
+                PlayRocket(
+                    phase: playPhase,
+                    color: actionAccent,
+                    isDragging: isDragging,
+                    dragDirection: dragDirection
+                )
                 .frame(width: settings.size * 0.88, height: settings.size * 0.80)
-                .opacity(isRocketMode ? 1 : 0)
-                .scaleEffect(isRocketMode ? 1 : 0.48)
+                .transition(.identity)
+            } else {
+                ZStack {
+                    Image(nsImage: RobotAsset.image(named: spriteName))
+                        .resizable()
+                        .scaledToFit()
+
+                    Image(nsImage: RobotAsset.image(named: spriteName))
+                        .resizable()
+                        .scaledToFit()
+                        .scaleEffect(x: -1, y: 1)
+                        .mask(
+                            Capsule()
+                                .frame(width: settings.size * 0.095, height: settings.size * 0.20)
+                                .offset(x: settings.size * 0.060, y: settings.size * 0.045)
+                                .blur(radius: 1.5)
+                        )
+
+                    ActionEyes(action: isDragging ? .hover : runtime.action, color: eyeAccent)
+                        .frame(width: settings.size * 0.36, height: settings.size * 0.10)
+                        .offset(x: settings.size * 0.035, y: -settings.size * 0.238)
+                        .animation(.easeInOut(duration: 1.35), value: runtime.action)
+
+                    Circle()
+                        .fill(
+                            RadialGradient(
+                                colors: [.white.opacity(0.94), actionAccent.opacity(0.72), actionAccent.opacity(0.34)],
+                                center: .center,
+                                startRadius: 0,
+                                endRadius: settings.size * 0.032
+                            )
+                        )
+                        .frame(width: settings.size * 0.058, height: settings.size * 0.058)
+                        .overlay(Circle().stroke(.white.opacity(0.72), lineWidth: 0.8))
+                        .shadow(color: actionAccent.opacity(0.38), radius: isDragging ? 12 : 9)
+                        .scaleEffect(1 + sin(phase * (isDragging ? 1.4 : 0.22)) * 0.065)
+                        .offset(
+                            x: settings.size * PetMotionSpec.chestCoreNormalizedX,
+                            y: settings.size * PetMotionSpec.chestCoreNormalizedY
+                        )
+                        .animation(.easeInOut(duration: 1.8), value: runtime.action)
+                }
+                .transition(.identity)
+            }
         }
+            // Rocket and robot are mutually exclusive. Disabling the implicit
+            // cross-fade prevents the baked source sprite flashing at both ends
+            // of the play sequence.
+            .animation(nil, value: isRocketMode)
             .frame(width: settings.size, height: settings.size)
             .contentShape(Rectangle())
             .opacity(settings.opacity)
@@ -242,7 +247,7 @@ struct PetView: View {
     private var eyeAccent: Color {
         // Eyes stay calm and recognizable across actions. Motion and shape carry
         // expression; only the chest core uses the per-action accent palette.
-        Color(red: 0.32, green: 0.78, blue: 0.96)
+        Color(red: 0.30, green: 0.82, blue: 1.0)
     }
 
     private var dragGesture: some Gesture {
@@ -461,14 +466,16 @@ private struct ActionEyes: View {
 
     var body: some View {
         ZStack {
-            // A compact, flat patch stays fully inside the original visor and
-            // covers the baked-in source eyes without creating raised black bumps.
+            // The eye canvas is intentionally wider than the backdrop. This lets
+            // the expression match the hero artwork while the flat source-eye
+            // cover remains safely inset inside the original visor.
             RoundedRectangle(cornerRadius: 7, style: .continuous)
                 .fill(Color(red: 0.006, green: 0.012, blue: 0.018).opacity(0.985))
+                .scaleEffect(x: 0.95, y: 0.86)
 
             expression
-                .padding(.horizontal, 7)
-                .padding(.vertical, 1)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
         }
     }
 
@@ -476,15 +483,15 @@ private struct ActionEyes: View {
     private var expression: some View {
         switch action {
         case .idle:
-            ArcEyes(lift: 0.22, color: color, opacity: 0.97, lineWidth: 3.4)
+            ArcEyes(lift: 0.24, color: color, opacity: 1.0, lineWidth: 4.2)
         case .hover:
             FocusedEyes(color: color)
         case .cheer:
-            ArcEyes(lift: 0.38, color: color, opacity: 1.0, lineWidth: 3.7)
+            ArcEyes(lift: 0.42, color: color, opacity: 1.0, lineWidth: 4.5)
         case .play:
             RoundPlayEyes(color: color)
         case .sleep:
-            ArcEyes(lift: -0.08, color: color, opacity: 0.76, lineWidth: 2.6)
+            ArcEyes(lift: -0.08, color: color, opacity: 0.86, lineWidth: 3.2)
         }
     }
 }
@@ -498,7 +505,7 @@ private struct ArcEyes: View {
     var body: some View {
         EyeArcPair(lift: lift)
             .stroke(color.opacity(opacity), style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
-            .shadow(color: color.opacity(0.38), radius: 3)
+            .shadow(color: color.opacity(0.52), radius: 4)
     }
 }
 
@@ -508,7 +515,7 @@ private struct EyeArcPair: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
         let baseline = rect.height * 0.64
-        let eyeWidth = rect.width * 0.27
+        let eyeWidth = rect.width * 0.28
         let halfWidth = eyeWidth / 2
         let centers = [rect.width * 0.28, rect.width * 0.72]
         for centerX in centers {
@@ -527,8 +534,8 @@ private struct FocusedEyes: View {
 
     var body: some View {
         FocusedEyePair()
-            .stroke(color.opacity(0.96), style: StrokeStyle(lineWidth: 3.4, lineCap: .round))
-            .shadow(color: color.opacity(0.36), radius: 3)
+            .stroke(color, style: StrokeStyle(lineWidth: 4.2, lineCap: .round))
+            .shadow(color: color.opacity(0.48), radius: 4)
     }
 }
 
