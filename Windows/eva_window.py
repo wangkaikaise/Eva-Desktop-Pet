@@ -18,11 +18,14 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import (
     QPainter, QColor, QPixmap, QImage, QMouseEvent, QFont,
-    QFontMetrics, QPainterPath, QLinearGradient, QRadialGradient, QAction, QIcon, QCursor, QPen
+    QFontMetrics, QFontDatabase, QPainterPath, QLinearGradient,
+    QRadialGradient, QAction, QIcon, QCursor, QPen
 )
 from PySide6.QtSvg import QSvgRenderer
 from state_machine import PetStateMachine, PetAction, ACTION_TITLES, PetMood, Pose
-from settings import PetSettings, SettingsRepository, PetReminder
+from settings import (
+    PetSettings, SettingsRepository, PetReminder, metrics_font_family,
+)
 from metrics import MetricsCollector
 from reminders import ReminderScheduler
 
@@ -737,14 +740,16 @@ class EvaWindow(QMainWindow):
         """窗口宽度：metrics 在左右时额外加宽，避免卡片遮挡本体。"""
         base = self.settings.size + 340
         if self.settings.metricsEnabled and self.settings.metricsPosition in ("left", "right"):
-            return int(base + 240)  # 卡片宽(~170) + 间距(~70)
+            font_scale = max(1.0, getattr(self.settings, "metricsFontSize", 10) / 10)
+            return int(base + 240 * font_scale)
         return int(base)
 
     def _window_height(self):
         """窗口高度：metrics 在上下时额外加高，避免卡片遮挡本体。"""
         base = self.settings.size + 340
         if self.settings.metricsEnabled and self.settings.metricsPosition in ("top", "bottom"):
-            return int(base + 180)  # 卡片高(~100) + 间距(~80)
+            font_scale = max(1.0, getattr(self.settings, "metricsFontSize", 10) / 10)
+            return int(base + 180 * font_scale)
         return int(base)
 
     def _body_size(self):
@@ -1003,50 +1008,28 @@ class EvaWindow(QMainWindow):
         self._settings_dialog = None
 
     def _auto_start_temp_helper(self):
-        """启动时自动启动温度助手（管理员权限时免 UAC）。
-        确保 PawnIO 驱动已安装，如果旧助手在运行先停止再启动新版。
+        """启动温度助手；普通权限下由 Windows 显示一次 UAC。
+        首次使用时，提权助手会在自己的管理员上下文中安装 PawnIO。
         启动后 5 秒检查助手是否真正在产出数据，失败则显示诊断信息。
         """
         try:
             from metrics import (start_elevated_temp_helper, helper_status,
-                                 ensure_pawnio_driver,
-                                 is_admin, write_temp_mode,
-                                 lhm_available)
-            import subprocess
+                                 write_temp_mode)
             # 写入当前温度模式
             temp_mode = getattr(self.settings, "metricsCpuTempMode", "max")
             write_temp_mode(temp_mode)
-            # 如果已有助手在运行，先杀掉它（确保使用最新脚本逻辑）
-            status, _ = helper_status()
-            if status == "alive" and is_admin():
-                # 用 wmic 杀掉运行 helper.ps1 的 PowerShell 进程
-                try:
-                    subprocess.run(
-                        ["wmic", "process", "where",
-                         "commandline like '%eva_pet_helper%helper.ps1%'",
-                         "call", "terminate"],
-                        capture_output=True, timeout=5)
-                except Exception:
-                    pass
-                import time as _time
-                _time.sleep(1)
-            if is_admin():
-                # 确保 PawnIO 驱动已安装（首次运行在新机器上自动安装）
-                if not lhm_available():
-                    driver_ok, driver_msg = ensure_pawnio_driver()
-                    if driver_ok:
-                        logger.info("PawnIO 驱动安装成功")
-                    else:
-                        logger.warning("PawnIO 驱动安装失败: %s", driver_msg)
-                ok, msg = start_elevated_temp_helper(temp_mode)
-                if ok:
-                    logger.info("温度助手已自动启动（管理员权限，模式=%s）", temp_mode)
-                    # 5 秒后检查助手是否真正在产出数据
-                    QTimer.singleShot(5000, self._check_temp_helper_health)
-                else:
-                    logger.warning("温度助手自动启动失败: %s", msg)
+            status, val = helper_status()
+            if status == "alive" and val:
+                self.metrics.reset_temp_cache()
+                self._sample_metrics()
+                return
+            ok, msg = start_elevated_temp_helper(temp_mode)
+            if ok:
+                logger.info("温度助手已启动（模式=%s）", temp_mode)
+                QTimer.singleShot(7000, self._check_temp_helper_health)
             else:
-                logger.info("非管理员权限，温度助手需手动启用")
+                logger.warning("温度助手启动失败: %s", msg)
+                self.tray.showMessage("CPU温度", msg, self.app_icon, 5000)
         except Exception:
             logger.error("自动启动温度助手失败:\n%s", traceback.format_exc())
 
@@ -1056,6 +1039,8 @@ class EvaWindow(QMainWindow):
             from metrics import helper_status, helper_error
             status, val = helper_status()
             if status == "alive" and val:
+                self.metrics.reset_temp_cache()
+                self._sample_metrics()
                 return  # 助手正常工作
             # 助手没有产出数据，检查错误原因
             err = helper_error()
@@ -1098,6 +1083,7 @@ class EvaWindow(QMainWindow):
                 self, "启用CPU温度",
                 "读取 CPU 硬件传感器需要内核驱动访问权限。\n\n"
                 "将以管理员权限启动一个小型后台温度助手\n"
+                "（首次使用会同时安装温度读取驱动）\n"
                 "（宠物退出后它会自动结束），接下来会弹出\n"
                 "UAC 确认框，是否继续？",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
@@ -1105,18 +1091,8 @@ class EvaWindow(QMainWindow):
             )
             if ret != QMessageBox.StandardButton.Yes:
                 return
-            # 确保驱动已安装
-            from metrics import ensure_pawnio_driver, lhm_available
-            if not lhm_available():
-                d_ok, d_msg = ensure_pawnio_driver()
-                if not d_ok:
-                    box = QMessageBox(QMessageBox.Icon.Warning, "启用CPU温度",
-                                      f"PawnIO 驱动安装失败：\n{d_msg}")
-                    box.setWindowFlags(
-                        box.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
-                    box.exec()
-                    return
-            ok, msg = start_elevated_temp_helper()
+            temp_mode = getattr(self.settings, "metricsCpuTempMode", "max")
+            ok, msg = start_elevated_temp_helper(temp_mode)
             if not ok:
                 box = QMessageBox(QMessageBox.Icon.Warning, "启用CPU温度",
                                   f"启动失败：{msg}")
@@ -1194,6 +1170,8 @@ class EvaWindow(QMainWindow):
             old is None
             or old.metricsEnabled != self.settings.metricsEnabled
             or old.metricsPosition != self.settings.metricsPosition
+            or old.metricsFont != self.settings.metricsFont
+            or getattr(old, "metricsFontSize", 10) != self.settings.metricsFontSize
         )
         if old is None or old.size != self.settings.size or _metrics_changed:
             old_size = self.size()
@@ -1206,8 +1184,8 @@ class EvaWindow(QMainWindow):
         if self.settings.metricsEnabled:
             self.metrics_timer.start(self.settings.metricsRefreshSeconds * 1000)
             # 刚刚从关闭→开启时自动启动温度助手
-            if (old is not None and not old.metricsEnabled
-                    and self.settings.metricsShowCpuTemp):
+            if (old is not None and self.settings.metricsShowCpuTemp
+                    and (not old.metricsEnabled or not old.metricsShowCpuTemp)):
                 QTimer.singleShot(1000, self._auto_start_temp_helper)
             # 温度模式变化时动态切换（写 mode 文件，助手下次循环读取）
             if old is not None and getattr(old, "metricsCpuTempMode", "max") != getattr(self.settings, "metricsCpuTempMode", "max"):
@@ -1227,6 +1205,7 @@ class EvaWindow(QMainWindow):
         # 仅在自启设置变化时写注册表
         if old is None or old.startOnLogin != self.settings.startOnLogin:
             self._apply_startup()
+        self.update()
 
     def _apply_startup(self):
         if os.name != "nt":
@@ -1965,18 +1944,10 @@ class EvaWindow(QMainWindow):
             return
         rows = max(len(c) for c in columns)
 
-        # 字体设置真实生效；数字启用等宽样式以避免刷新时左右跳动。
-        family = {
-            "rounded": "Segoe UI Variable Display",
-            "system": "Segoe UI",
-            "monospace": "Cascadia Mono",
-        }.get(self.settings.metricsFont, "Segoe UI Variable Display")
-        font = QFont(family, 10)
+        # 使用用户从 Windows 已安装字体列表中选择的真实字体与字号。
+        font = self._metrics_font()
         font.setBold(True)
         font.setWeight(QFont.Weight.DemiBold)
-        if self.settings.metricsFont == "monospace":
-            font.setStyleHint(QFont.StyleHint.Monospace)
-            font.setFixedPitch(True)
         painter.setFont(font)
         fm = QFontMetrics(font)
 
@@ -2074,6 +2045,20 @@ class EvaWindow(QMainWindow):
                 painter.drawText(QPointF(vx, ty), value)
                 ty += line_h
         painter.setOpacity(1.0)
+
+    def _metrics_font(self) -> QFont:
+        """Resolve the configured family without silently collapsing choices."""
+        requested = metrics_font_family(self.settings.metricsFont)
+        installed = set(QFontDatabase.families())
+        candidates = (
+            requested,
+            "Microsoft YaHei UI",
+            "Microsoft YaHei",
+            "Segoe UI",
+            QFont().defaultFamily(),
+        )
+        family = next((name for name in candidates if name in installed), candidates[-1])
+        return QFont(family, getattr(self.settings, "metricsFontSize", 10))
 
     def _metrics_rect(self, body_rect: QRectF, w_total: float, h_total: float) -> QRectF:
         """与 _draw_metrics 一致的逻辑，返回性能卡片的最终 rect。"""

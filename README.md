@@ -1,4 +1,4 @@
-# 伊娃桌面宠物 · Mac 2.0.3 / Windows 13.3.0
+# 伊娃桌面宠物 · Mac 2.0.3 / Windows 13.3.1
 
 <table align="center">
   <tr>
@@ -21,7 +21,7 @@
 
 <p align="center">
   <a href="https://github.com/wangkaikaise/Eva-Desktop-Pet/releases/tag/v2.0.3"><img src="https://img.shields.io/badge/Mac-2.0.3-111111?style=flat-square&logo=apple" alt="Mac 2.0.3"></a>
-  <a href="https://github.com/wangkaikaise/Eva-Desktop-Pet/releases/tag/windows-v13.3.0"><img src="https://img.shields.io/badge/Windows-13.3.0-0078D4?style=flat-square&logo=windows11" alt="Windows 13.3.0"></a>
+  <a href="https://github.com/wangkaikaise/Eva-Desktop-Pet/releases/tag/windows-v13.3.1"><img src="https://img.shields.io/badge/Windows-13.3.1-0078D4?style=flat-square&logo=windows11" alt="Windows 13.3.1"></a>
   <img src="https://img.shields.io/badge/macOS-13%2B-111111?style=flat-square&logo=apple" alt="macOS 13+">
   <img src="https://img.shields.io/badge/Swift-6.0-F05138?style=flat-square&logo=swift" alt="Swift 6.0">
   <a href="LICENSE"><img src="https://img.shields.io/badge/Code-MIT-2f81f7?style=flat-square" alt="MIT License"></a>
@@ -29,7 +29,7 @@
 
 伊娃以白色机身、黑色面屏和蓝色柔光构成简洁的三色形象，悬浮在桌面上陪伴工作。她拥有连续动作、表情反馈、拖动与点击互动、性能信息卡片、玻璃光效和日常提醒，并通过原生菜单栏提供快速控制。
 
-> [下载 Mac 2.0.3](https://github.com/wangkaikaise/Eva-Desktop-Pet/releases/tag/v2.0.3) · [下载 Windows 13.3.0](https://github.com/wangkaikaise/Eva-Desktop-Pet/releases/tag/windows-v13.3.0)
+> [下载 Mac 2.0.3](https://github.com/wangkaikaise/Eva-Desktop-Pet/releases/tag/v2.0.3) · [下载 Windows 13.3.1](https://github.com/wangkaikaise/Eva-Desktop-Pet/releases/tag/windows-v13.3.1)
 
 ## 核心功能
 
@@ -115,13 +115,13 @@ Windows 版源码位于 [`Windows/`](Windows/README.md)，采用 Python 3.13、P
 - 性能卡片支持四向标准位置、完全透明背景、字体、颜色和透明度设置
 - 休眠提示、玻璃防护罩、悬浮光池和菜单栏头像完成统一设计
 
-## Windows 13.3.0 当前版本说明
+## Windows 13.3.1 当前版本说明
 
 - 对齐 Mac 2.0.3 的五状态造型、动态眼睛、居中单核心与三色视觉
 - 玩耍状态为可直接拖动的白色小火箭，进入和退出使用无闪烁交叉淡化
 - 使用 Win32 原生鼠标与窗口坐标实现 1:1 跟手拖动，并支持 Per-Monitor V2 DPI
-- CPU/GPU 卡片支持四向位置、完全透明背景、字体、颜色与独立内容透明度
-- CPU 温度扩展改为用户主动启用时才请求 UAC，基础应用始终普通权限运行
+- CPU/GPU 卡片支持四向位置、完全透明背景、系统字体、8–18 pt 字号、颜色与独立内容透明度
+- 修复普通权限启动时 CPU 温度驱动无法安装的问题；首次启用由独立助手请求 UAC，基础应用始终普通权限运行
 - 修复配置热更新、睡眠恢复提醒、首次启动性能和明暗托盘头像适配
 - Windows x64 包由 GitHub Actions 可复现构建；源码、测试与第三方许可说明位于 `Windows/`
 
@@ -137,7 +137,7 @@ Windows 版源码位于 [`Windows/`](Windows/README.md)，采用 Python 3.13、P
 ### Windows
 
 - Windows 10 22H2 或 Windows 11，x64
-- 下载 `Eva-Desktop-Pet-Windows-13.3.0-x64.zip`，解压后运行 `EvaDesktopPet.exe`
+- 下载 `Eva-Desktop-Pet-Windows-13.3.1-x64.zip`，解压后运行 `EvaDesktopPet.exe`
 - 当前公开包尚未进行商业 Authenticode 签名；首次运行前请核对 Release 中的 `.sha256` 文件
 - CPU 温度需要用户主动启用可选硬件监控扩展；其余功能不需要管理员权限
 

@@ -4,11 +4,12 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QImage
+from PySide6.QtGui import QFont, QFontDatabase, QImage
 from PySide6.QtWidgets import QApplication
 
 from eva_window import EvaWindow
 from settings import PetSettings, SettingsRepository
+from settings_dialog import SettingsDialog
 from state_machine import PetAction
 
 
@@ -61,3 +62,28 @@ def test_settings_rebind_state_and_metrics(window):
     window._on_settings_applied(updated, [])
     assert window.state.settings is updated
     assert window.metrics.settings is updated
+
+
+def test_metrics_font_family_and_size_are_applied(window):
+    family = QFontDatabase.families()[0]
+    updated = PetSettings(
+        metricsEnabled=True,
+        metricsFont=family,
+        metricsFontSize=15,
+        startOnLogin=False,
+    )
+    window._on_settings_applied(updated, [])
+    font = window._metrics_font()
+    assert font.family() == family
+    assert font.pointSize() == 15
+
+
+def test_settings_dialog_collects_system_font_and_size(app):
+    family = QFontDatabase.families()[0]
+    dialog = SettingsDialog(PetSettings(), [])
+    dialog.combo_font.setCurrentFont(QFont(family))
+    dialog.spin_font_size.setValue(16)
+    dialog._collect()
+    assert dialog.settings.metricsFont == family
+    assert dialog.settings.metricsFontSize == 16
+    dialog.close()
