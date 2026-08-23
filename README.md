@@ -113,7 +113,7 @@
 ## 系统要求与安装
 
 - macOS 13 或更高版本
-- Apple Silicon 或 Intel Mac
+- Apple Silicon Mac（当前 Release 为 arm64 构建）
 
 从 [Releases](https://github.com/wangkaikaise/Eva-Desktop-Pet/releases/latest) 下载 ZIP，解压后将 `Eva Desktop Pet.app` 拖入“应用程序”文件夹。当前公开包使用 ad-hoc 签名；若 macOS 首次阻止启动，请在“系统设置 → 隐私与安全性”中确认打开。
 
