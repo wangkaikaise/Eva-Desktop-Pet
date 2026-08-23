@@ -38,6 +38,18 @@ _EVT_DPR_CHANGE = getattr(QEvent.Type, "DevicePixelRatioChange", None)
 # 短暂跳过绘制即可让 backing store 完成重建；窗口位置仍持续 1:1 跟手。
 _SCREEN_TRANSITION_GRACE = 0.16
 
+
+def resolve_metrics_font_family(requested, installed, fallback):
+    """Choose the requested installed family, with predictable Windows fallbacks."""
+    candidates = (
+        metrics_font_family(requested),
+        "Microsoft YaHei UI",
+        "Microsoft YaHei",
+        "Segoe UI",
+        fallback,
+    )
+    return next((name for name in candidates if name in installed), fallback)
+
 # Windows 消息常量
 _WM_DPICHANGED = 0x02E0
 _WM_DISPLAYCHANGE = 0x011D
@@ -2048,16 +2060,12 @@ class EvaWindow(QMainWindow):
 
     def _metrics_font(self) -> QFont:
         """Resolve the configured family without silently collapsing choices."""
-        requested = metrics_font_family(self.settings.metricsFont)
         installed = set(QFontDatabase.families())
-        candidates = (
-            requested,
-            "Microsoft YaHei UI",
-            "Microsoft YaHei",
-            "Segoe UI",
+        family = resolve_metrics_font_family(
+            self.settings.metricsFont,
+            installed,
             QFont().defaultFamily(),
         )
-        family = next((name for name in candidates if name in installed), candidates[-1])
         return QFont(family, getattr(self.settings, "metricsFontSize", 10))
 
     def _metrics_rect(self, body_rect: QRectF, w_total: float, h_total: float) -> QRectF:

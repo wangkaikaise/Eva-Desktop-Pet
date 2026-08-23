@@ -7,8 +7,8 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont, QFontDatabase, QImage
 from PySide6.QtWidgets import QApplication
 
-from eva_window import EvaWindow
-from settings import PetSettings, SettingsRepository
+from eva_window import EvaWindow, resolve_metrics_font_family
+from settings import PetSettings, SettingsRepository, metrics_font_family
 from settings_dialog import SettingsDialog
 from state_machine import PetAction
 
@@ -65,7 +65,8 @@ def test_settings_rebind_state_and_metrics(window):
 
 
 def test_metrics_font_family_and_size_are_applied(window):
-    family = QFontDatabase.families()[0]
+    families = QFontDatabase.families()
+    family = families[0] if families else "Segoe UI"
     updated = PetSettings(
         metricsEnabled=True,
         metricsFont=family,
@@ -74,16 +75,19 @@ def test_metrics_font_family_and_size_are_applied(window):
     )
     window._on_settings_applied(updated, [])
     font = window._metrics_font()
-    assert font.family() == family
     assert font.pointSize() == 15
+    assert resolve_metrics_font_family("Chosen Font", {"Chosen Font"}, "Fallback") == "Chosen Font"
+    assert resolve_metrics_font_family("Missing Font", set(), "Fallback") == "Fallback"
 
 
 def test_settings_dialog_collects_system_font_and_size(app):
-    family = QFontDatabase.families()[0]
     dialog = SettingsDialog(PetSettings(), [])
-    dialog.combo_font.setCurrentFont(QFont(family))
+    families = QFontDatabase.families()
+    if families:
+        dialog.combo_font.setCurrentFont(QFont(families[0]))
+    selected_family = dialog.combo_font.currentFont().family()
     dialog.spin_font_size.setValue(16)
     dialog._collect()
-    assert dialog.settings.metricsFont == family
+    assert dialog.settings.metricsFont == metrics_font_family(selected_family)
     assert dialog.settings.metricsFontSize == 16
     dialog.close()
