@@ -1,0 +1,61 @@
+name: Windows
+
+on:
+  pull_request:
+    paths:
+      - "Windows/**"
+      - ".github/workflows/windows.yml"
+  push:
+    branches: [main]
+    paths:
+      - "Windows/**"
+      - ".github/workflows/windows.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-package:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: Windows
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: |
+            Windows/requirements.txt
+            Windows/requirements-dev.txt
+
+      - name: Test and build
+        shell: powershell
+        run: .\scripts\build_windows.ps1
+
+      - name: Smoke-test clean application shutdown
+        shell: powershell
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: .\.venv\Scripts\python.exe test_smoke_quit.py
+
+      - name: Inspect package
+        shell: powershell
+        run: |
+          $exe = Get-Item .\dist\EvaDesktopPet\EvaDesktopPet.exe
+          $zip = Get-Item .\dist\Eva-Desktop-Pet-Windows-13.3.0-x64.zip
+          Write-Host "EXE bytes: $($exe.Length)"
+          Write-Host "ZIP bytes: $($zip.Length)"
+          Get-FileHash -Algorithm SHA256 $zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Eva-Desktop-Pet-Windows-13.3.0-x64
+          path: Windows/dist/Eva-Desktop-Pet-Windows-13.3.0-x64.zip
+          if-no-files-found: error
+          retention-days: 14
