@@ -1233,9 +1233,17 @@ class EvaWindow(QMainWindow):
             return
         try:
             import winreg
-            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
-                                 r"Software\Microsoft\Windows\CurrentVersion\Run",
-                                 0, winreg.KEY_SET_VALUE)
+            run_key = r"Software\Microsoft\Windows\CurrentVersion\Run"
+            try:
+                key = winreg.OpenKey(
+                    winreg.HKEY_CURRENT_USER, run_key, 0, winreg.KEY_SET_VALUE
+                )
+            except FileNotFoundError:
+                if not self.settings.startOnLogin:
+                    return
+                key = winreg.CreateKeyEx(
+                    winreg.HKEY_CURRENT_USER, run_key, 0, winreg.KEY_SET_VALUE
+                )
             # 打包后 __file__ 指向解包临时目录，必须用 sys.executable
             if getattr(sys, "frozen", False):
                 exe = sys.executable

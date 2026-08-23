@@ -23,15 +23,15 @@ def main():
     settings = repo.load_settings()
     window = EvaWindow(settings, repo)
     window.show()
-    print("启动完成，6 秒后模拟托盘退出...", flush=True)
+    print("STARTED: simulating tray quit in 6 seconds...", flush=True)
 
     def do_quit():
-        print("触发 _quit()...", flush=True)
+        print("CALLING: _quit()", flush=True)
         window._quit()
 
     QTimer.singleShot(6000, do_quit)
     ret = app.exec()
-    print(f"事件循环退出码: {ret}", flush=True)
+    print(f"EVENT_LOOP_EXIT: {ret}", flush=True)
     print("RESULT: CLEAN_EXIT", flush=True)
     sys.exit(0 if ret == 0 else 1)
 
