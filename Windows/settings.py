@@ -37,7 +37,7 @@ class PetReminder:
 
 @dataclass
 class PetSettings:
-    schemaVersion: int = 1
+    schemaVersion: int = 2
     size: int = 220
     opacity: float = 1.0
     animationSpeed: float = 0.8
@@ -54,7 +54,7 @@ class PetSettings:
     metricsRefreshSeconds: int = 5
     metricsShowCpu: bool = True
     metricsShowCpuTemp: bool = True
-    metricsCpuTempMode: str = "max"  # max, avg
+    metricsCpuTempMode: str = "avg"  # avg matches core-monitoring tools; max is hotspot
     metricsShowGpu: bool = True
     metricsShowGpuTemp: bool = True
     metricsBackgroundOpacity: float = 0.28
@@ -71,6 +71,7 @@ class PetSettings:
         self.lightPoolBrightness = max(0.1, min(1.0, round(self.lightPoolBrightness / 0.05) * 0.05))
         self.moodIntervalMinutes = max(15, min(60, self.moodIntervalMinutes))
         self.metricsRefreshSeconds = 5 if self.metricsRefreshSeconds not in (2, 5, 10) else self.metricsRefreshSeconds
+        self.metricsCpuTempMode = self.metricsCpuTempMode if self.metricsCpuTempMode in ("avg", "max") else "avg"
         self.metricsBackgroundOpacity = max(0.0, min(0.75, self.metricsBackgroundOpacity))
         self.metricsContentOpacity = max(0.25, min(1.0, self.metricsContentOpacity))
         self.metricsFont = metrics_font_family(self.metricsFont)
@@ -83,6 +84,12 @@ class PetSettings:
     def from_dict(cls, d):
         fields = cls.__dataclass_fields__
         filtered = {k: v for k, v in d.items() if k in fields}
+        # 13.3.1 and earlier defaulted to the hottest package/core sensor. Existing
+        # users therefore saw a value 10–20 °C above tools that show core average.
+        # Migrate that old default once; users can still select "highest" afterwards.
+        if int(d.get("schemaVersion", 1) or 1) < 2:
+            filtered["metricsCpuTempMode"] = "avg"
+            filtered["schemaVersion"] = 2
         return cls(**filtered)
 
 

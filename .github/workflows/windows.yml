@@ -13,7 +13,7 @@ on:
   workflow_dispatch:
     inputs:
       publish:
-        description: "Create or update the Windows 13.3.1 GitHub Release"
+        description: "Create or update the Windows 13.3.2 GitHub Release"
         required: true
         default: false
         type: boolean
@@ -55,15 +55,15 @@ jobs:
         shell: powershell
         run: |
           $exe = Get-Item .\dist\EvaDesktopPet\EvaDesktopPet.exe
-          $zip = Get-Item .\dist\Eva-Desktop-Pet-Windows-13.3.1-x64.zip
+          $zip = Get-Item .\dist\Eva-Desktop-Pet-Windows-13.3.2-x64.zip
           Write-Host "EXE bytes: $($exe.Length)"
           Write-Host "ZIP bytes: $($zip.Length)"
           Get-FileHash -Algorithm SHA256 $zip
 
       - uses: actions/upload-artifact@v7
         with:
-          name: Eva-Desktop-Pet-Windows-13.3.1-x64
-          path: Windows/dist/Eva-Desktop-Pet-Windows-13.3.1-x64.zip
+          name: Eva-Desktop-Pet-Windows-13.3.2-x64
+          path: Windows/dist/Eva-Desktop-Pet-Windows-13.3.2-x64.zip
           if-no-files-found: error
           retention-days: 14
 
@@ -73,12 +73,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $tag = "windows-v13.3.1"
-          $asset = ".\dist\Eva-Desktop-Pet-Windows-13.3.1-x64.zip"
+          $tag = "windows-v13.3.2"
+          $asset = ".\dist\Eva-Desktop-Pet-Windows-13.3.2-x64.zip"
           $checksum = "$asset.sha256"
           $hash = (Get-FileHash -Algorithm SHA256 $asset).Hash.ToLowerInvariant()
-          $title = "$([char]0x4F0A)$([char]0x5A03)$([char]0x684C)$([char]0x9762)$([char]0x5BA0)$([char]0x7269) $([char]0x00B7) Windows 13.3.1"
-          [IO.File]::WriteAllText($checksum, "$hash *Eva-Desktop-Pet-Windows-13.3.1-x64.zip`n", [Text.Encoding]::ASCII)
+          $title = "$([char]0x4F0A)$([char]0x5A03)$([char]0x684C)$([char]0x9762)$([char]0x5BA0)$([char]0x7269) $([char]0x00B7) Windows 13.3.2"
+          [IO.File]::WriteAllText($checksum, "$hash *Eva-Desktop-Pet-Windows-13.3.2-x64.zip`n", [Text.Encoding]::ASCII)
           Write-Host "Release SHA256: $hash"
           $releaseTags = @(gh release list --repo $env:GITHUB_REPOSITORY --limit 100 --json tagName | ConvertFrom-Json).tagName
           if ($releaseTags -contains $tag) {

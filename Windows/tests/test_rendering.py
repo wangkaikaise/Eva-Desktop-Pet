@@ -3,8 +3,8 @@ import os
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont, QFontDatabase, QImage
+from PySide6.QtCore import QRectF, Qt
+from PySide6.QtGui import QColor, QFont, QFontDatabase, QImage, QPainter
 from PySide6.QtWidgets import QApplication
 
 from eva_window import EvaWindow, resolve_metrics_font_family
@@ -91,3 +91,32 @@ def test_settings_dialog_collects_system_font_and_size(app):
     assert dialog.settings.metricsFont == metrics_font_family(selected_family)
     assert dialog.settings.metricsFontSize == 16
     dialog.close()
+
+
+def test_eye_transition_draws_one_symmetric_path_per_eye(window, monkeypatch):
+    window.state.current_action = PetAction.CHEER
+    window.state.target_action = PetAction.SLEEP
+    window.state.transition_progress = 0.5
+    calls = []
+
+    def record_arc(painter, rect, color, opacity, width, height, glow=1.0,
+                   curve_down=False):
+        calls.append((QRectF(rect), opacity, height, curve_down))
+
+    monkeypatch.setattr(window, "_draw_eye_mac_arc", record_arc)
+    image = QImage(240, 100, QImage.Format.Format_ARGB32_Premultiplied)
+    image.fill(Qt.GlobalColor.transparent)
+    painter = QPainter(image)
+    window._draw_eyes(
+        painter,
+        QRectF(50, 35, 45, 24),
+        QRectF(145, 35, 45, 24),
+        None,
+        QColor("#80C8EE"),
+        1.0,
+    )
+    painter.end()
+
+    assert len(calls) == 2
+    assert calls[0][1:] == calls[1][1:]
+    assert calls[0][2] >= 0.16
