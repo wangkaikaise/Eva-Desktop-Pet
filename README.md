@@ -1,4 +1,4 @@
-# 伊娃桌面宠物 · Mac 2.0.3
+# 伊娃桌面宠物 · Mac 2.0.3 / Windows 13.3.0
 
 <table align="center">
   <tr>
@@ -16,11 +16,12 @@
 </table>
 
 <p align="center">
-  一位温暖、轻量、会回应你的原生 macOS 桌面机器人伙伴。
+  一位温暖、轻量、会回应你的 macOS 与 Windows 桌面机器人伙伴。
 </p>
 
 <p align="center">
-  <a href="https://github.com/wangkaikaise/Eva-Desktop-Pet/releases/latest"><img src="https://img.shields.io/github/v/release/wangkaikaise/Eva-Desktop-Pet?display_name=tag&style=flat-square&label=Mac" alt="GitHub Release"></a>
+  <a href="https://github.com/wangkaikaise/Eva-Desktop-Pet/releases/tag/v2.0.3"><img src="https://img.shields.io/badge/Mac-2.0.3-111111?style=flat-square&logo=apple" alt="Mac 2.0.3"></a>
+  <a href="https://github.com/wangkaikaise/Eva-Desktop-Pet/releases/tag/windows-v13.3.0"><img src="https://img.shields.io/badge/Windows-13.3.0-0078D4?style=flat-square&logo=windows11" alt="Windows 13.3.0"></a>
   <img src="https://img.shields.io/badge/macOS-13%2B-111111?style=flat-square&logo=apple" alt="macOS 13+">
   <img src="https://img.shields.io/badge/Swift-6.0-F05138?style=flat-square&logo=swift" alt="Swift 6.0">
   <a href="LICENSE"><img src="https://img.shields.io/badge/Code-MIT-2f81f7?style=flat-square" alt="MIT License"></a>
@@ -28,7 +29,7 @@
 
 伊娃以白色机身、黑色面屏和蓝色柔光构成简洁的三色形象，悬浮在桌面上陪伴工作。她拥有连续动作、表情反馈、拖动与点击互动、性能信息卡片、玻璃光效和日常提醒，并通过原生菜单栏提供快速控制。
 
-> [下载最新版 Mac 2.0.3](https://github.com/wangkaikaise/Eva-Desktop-Pet/releases/latest) · 下载 ZIP，解压后将应用拖入“应用程序”文件夹。
+> [下载 Mac 2.0.3](https://github.com/wangkaikaise/Eva-Desktop-Pet/releases/tag/v2.0.3) · [下载 Windows 13.3.0](https://github.com/wangkaikaise/Eva-Desktop-Pet/releases/tag/windows-v13.3.0)
 
 ## 核心功能
 
@@ -85,6 +86,8 @@
 
 状态更新由 `ObservableObject` 驱动并通过 SwiftUI 响应式刷新；悬浮窗口与菜单栏由 `AppDelegate` 统一管理，避免角色视图承担系统生命周期职责。系统指标与提醒均可关闭，不使用时不进行无意义采样或调度。
 
+Windows 版源码位于 [`Windows/`](Windows/README.md)，采用 Python 3.13、PySide6/Qt 6 与 Win32 分层实现：`eva_window.py` 负责透明窗口和渲染，`state_machine.py` 负责动作与情绪，`metrics.py` 在后台采样硬件数据，设置和提醒分别独立持久化。Windows CI 会校验第三方依赖哈希、执行静态检查和 11 项测试，并在真实 Windows runner 上完成 PyInstaller 打包与干净退出测试。
+
 ## 开发技术栈
 
 | 技术 | 用途 |
@@ -112,12 +115,31 @@
 - 性能卡片支持四向标准位置、完全透明背景、字体、颜色和透明度设置
 - 休眠提示、玻璃防护罩、悬浮光池和菜单栏头像完成统一设计
 
+## Windows 13.3.0 当前版本说明
+
+- 对齐 Mac 2.0.3 的五状态造型、动态眼睛、居中单核心与三色视觉
+- 玩耍状态为可直接拖动的白色小火箭，进入和退出使用无闪烁交叉淡化
+- 使用 Win32 原生鼠标与窗口坐标实现 1:1 跟手拖动，并支持 Per-Monitor V2 DPI
+- CPU/GPU 卡片支持四向位置、完全透明背景、字体、颜色与独立内容透明度
+- CPU 温度扩展改为用户主动启用时才请求 UAC，基础应用始终普通权限运行
+- 修复配置热更新、睡眠恢复提醒、首次启动性能和明暗托盘头像适配
+- Windows x64 包由 GitHub Actions 可复现构建；源码、测试与第三方许可说明位于 `Windows/`
+
 ## 系统要求与安装
+
+### macOS
 
 - macOS 13 或更高版本
 - Apple Silicon Mac（当前 Release 为 arm64 构建）
 
-从 [Releases](https://github.com/wangkaikaise/Eva-Desktop-Pet/releases/latest) 下载 ZIP，解压后将 `Eva Desktop Pet.app` 拖入“应用程序”文件夹。当前公开包使用 ad-hoc 签名；若 macOS 首次阻止启动，请在“系统设置 → 隐私与安全性”中确认打开。
+从 [Mac 2.0.3 Release](https://github.com/wangkaikaise/Eva-Desktop-Pet/releases/tag/v2.0.3) 下载 ZIP，解压后将 `Eva Desktop Pet.app` 拖入“应用程序”文件夹。当前公开包使用 ad-hoc 签名；若 macOS 首次阻止启动，请在“系统设置 → 隐私与安全性”中确认打开。
+
+### Windows
+
+- Windows 10 22H2 或 Windows 11，x64
+- 下载 `Eva-Desktop-Pet-Windows-13.3.0-x64.zip`，解压后运行 `EvaDesktopPet.exe`
+- 当前公开包尚未进行商业 Authenticode 签名；首次运行前请核对 Release 中的 `.sha256` 文件
+- CPU 温度需要用户主动启用可选硬件监控扩展；其余功能不需要管理员权限
 
 ## 使用方法
 
@@ -147,6 +169,12 @@ open "dist/Eva Desktop Pet.app"
 ```
 
 脚本会执行 release 构建、组装 `.app` 并进行本机 ad-hoc 签名。正式商业分发应改用 Apple Developer ID 签名，并完成 Apple notarization。
+
+Windows 版开发和打包命令见 [`Windows/README.md`](Windows/README.md)。标准发布命令为：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File Windows\scripts\build_windows.ps1
+```
 
 ## 性能数据说明
 

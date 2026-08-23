@@ -11,9 +11,15 @@ on:
       - "Windows/**"
       - ".github/workflows/windows.yml"
   workflow_dispatch:
+    inputs:
+      publish:
+        description: "Create or update the Windows 13.3.0 GitHub Release"
+        required: true
+        default: false
+        type: boolean
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   test-and-package:
@@ -54,9 +60,29 @@ jobs:
           Write-Host "ZIP bytes: $($zip.Length)"
           Get-FileHash -Algorithm SHA256 $zip
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: Eva-Desktop-Pet-Windows-13.3.0-x64
           path: Windows/dist/Eva-Desktop-Pet-Windows-13.3.0-x64.zip
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish Windows release
+        if: github.event_name == 'workflow_dispatch' && inputs.publish
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "windows-v13.3.0"
+          $asset = ".\dist\Eva-Desktop-Pet-Windows-13.3.0-x64.zip"
+          $checksum = "$asset.sha256"
+          $hash = (Get-FileHash -Algorithm SHA256 $asset).Hash.ToLowerInvariant()
+          "$hash *Eva-Desktop-Pet-Windows-13.3.0-x64.zip" | Set-Content -Encoding ascii $checksum
+          Write-Host "Release SHA256: $hash"
+          gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $asset $checksum --clobber --repo $env:GITHUB_REPOSITORY
+            gh release edit $tag --notes-file RELEASE_NOTES.md --repo $env:GITHUB_REPOSITORY
+          } else {
+            gh release create $tag $asset $checksum --title "伊娃桌面宠物 · Windows 13.3.0" --notes-file RELEASE_NOTES.md --repo $env:GITHUB_REPOSITORY
+          }
