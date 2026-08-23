@@ -79,8 +79,8 @@ jobs:
           $hash = (Get-FileHash -Algorithm SHA256 $asset).Hash.ToLowerInvariant()
           "$hash *Eva-Desktop-Pet-Windows-13.3.0-x64.zip" | Set-Content -Encoding ascii $checksum
           Write-Host "Release SHA256: $hash"
-          gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
-          if ($LASTEXITCODE -eq 0) {
+          $releaseTags = @(gh release list --repo $env:GITHUB_REPOSITORY --limit 100 --json tagName | ConvertFrom-Json).tagName
+          if ($releaseTags -contains $tag) {
             gh release upload $tag $asset $checksum --clobber --repo $env:GITHUB_REPOSITORY
             gh release edit $tag --notes-file RELEASE_NOTES.md --repo $env:GITHUB_REPOSITORY
           } else {
