@@ -32,3 +32,18 @@ def test_settings_clamp_ranges():
 def test_real_metrics_font_family_is_preserved():
     assert metrics_font_family("Segoe UI") == "Segoe UI"
     assert metrics_font_family("monospace") == "Consolas"
+
+
+def test_old_hotspot_default_migrates_to_core_average():
+    migrated = PetSettings.from_dict({
+        "schemaVersion": 1,
+        "metricsCpuTempMode": "max",
+    })
+    assert migrated.schemaVersion == 2
+    assert migrated.metricsCpuTempMode == "avg"
+
+    explicit_new_choice = PetSettings.from_dict({
+        "schemaVersion": 2,
+        "metricsCpuTempMode": "max",
+    })
+    assert explicit_new_choice.metricsCpuTempMode == "max"

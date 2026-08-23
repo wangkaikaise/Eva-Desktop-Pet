@@ -1,6 +1,6 @@
 # 伊娃桌面宠物 Windows 版开发规格
 
-版本基准：Mac 2.0.3 / Windows 13.3.1
+版本基准：Mac 2.0.3 / Windows 13.3.2
 目标平台：Windows 10 22H2、Windows 11，x64 与 arm64
 产品名：中文“伊娃桌面宠物”，英文“Eva Desktop Pet”
 

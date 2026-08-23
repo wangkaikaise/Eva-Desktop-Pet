@@ -25,6 +25,44 @@ _LHM_LOCK = threading.Lock()
 _LHM_STATE = {"computer": None, "temp_type": None, "failed": False}
 
 
+def select_cpu_temperature(readings, temp_mode="avg"):
+    """Select a CPU temperature with the same semantics as core monitors.
+
+    Average mode prefers LHM's dedicated Core/CCD Average sensor, then actual
+    per-core sensors, then AMD's die sensor, and only then all CPU readings.
+    This avoids averaging duplicate aggregate sensors or reporting the package
+    hotspot as though it were the normal core average.
+    """
+    valid = []
+    for name, raw_value in readings:
+        try:
+            value = float(raw_value)
+        except (TypeError, ValueError):
+            continue
+        if 0 < value < 120:
+            valid.append((str(name or ""), value))
+    if not valid:
+        return None
+    if temp_mode != "avg":
+        return max(value for _, value in valid)
+
+    averages = [
+        value for name, value in valid
+        if "core average" in name.lower() or "ccds average" in name.lower()
+    ]
+    per_core = [
+        value for name, value in valid
+        if (name.lower().startswith(("p-core #", "e-core #", "cpu core #", "core #"))
+            and "distance" not in name.lower())
+    ]
+    die = [
+        value for name, value in valid
+        if name.lower() in ("core (tctl/tdie)", "core (tdie)")
+    ]
+    selected = averages or per_core or die or [value for _, value in valid]
+    return round(sum(selected) / len(selected), 1)
+
+
 def _vendor_dir():
     """vendor DLL 目录：源码运行与 PyInstaller 打包后都能找到。"""
     if hasattr(sys, "_MEIPASS"):  # PyInstaller 解包目录
@@ -87,7 +125,7 @@ def ensure_pawnio_driver():
         return False, f"PawnIO 安装失败: {e}"
 
 
-def _lhm_ps_script(temp_mode="max"):
+def _lhm_ps_script(temp_mode="avg"):
     """生成读取 CPU 温度的 PowerShell 脚本，直接 .NET 互操作加载 LHM DLL。
     temp_mode: "max" 取最高温度，"avg" 取平均温度。
     """
@@ -97,7 +135,7 @@ def _lhm_ps_script(temp_mode="max"):
         return None
     ps_path = dll_path.replace("'", "''")
     vd = vendor_dir.replace("'", "''")
-    mode = temp_mode if temp_mode in ("max", "avg") else "max"
+    mode = temp_mode if temp_mode in ("max", "avg") else "avg"
     return f'''
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 try {{
@@ -124,6 +162,9 @@ try {{
     $sensorType = $asm.GetType('LibreHardwareMonitor.Hardware.SensorType')
     $tempType = [Enum]::Parse($sensorType, 'Temperature')
     $allTemps = [System.Collections.Generic.List[double]]::new()
+    $averageTemps = [System.Collections.Generic.List[double]]::new()
+    $coreTemps = [System.Collections.Generic.List[double]]::new()
+    $dieTemps = [System.Collections.Generic.List[double]]::new()
     foreach ($hw in $computer.Hardware) {{
         try {{ $hw.Update() }} catch {{ continue }}
         foreach ($sensor in $hw.Sensors) {{
@@ -131,16 +172,28 @@ try {{
                 $v = $sensor.Value
                 if ($v -ne $null -and $v -gt 0 -and $v -lt 120) {{
                     $allTemps.Add([double]$v)
+                    $name = [string]$sensor.Name
+                    if ($name -ieq 'Core Average' -or $name -ieq 'CCDs Average (Tdie)') {{
+                        $averageTemps.Add([double]$v)
+                    }} elseif ($name -match '^(P-Core #|E-Core #|CPU Core #|Core #)' -and $name -notmatch 'Distance') {{
+                        $coreTemps.Add([double]$v)
+                    }} elseif ($name -ieq 'Core (Tctl/Tdie)' -or $name -ieq 'Core (Tdie)') {{
+                        $dieTemps.Add([double]$v)
+                    }}
                 }}
             }}
         }}
     }}
     $computer.Close()
     $mode = '{mode}'
-    if ($mode -eq 'avg' -and $allTemps.Count -gt 0) {{
+    $selectedTemps = $allTemps
+    if ($averageTemps.Count -gt 0) {{ $selectedTemps = $averageTemps }}
+    elseif ($coreTemps.Count -gt 0) {{ $selectedTemps = $coreTemps }}
+    elseif ($dieTemps.Count -gt 0) {{ $selectedTemps = $dieTemps }}
+    if ($mode -eq 'avg' -and $selectedTemps.Count -gt 0) {{
         $sum = 0.0
-        foreach ($t in $allTemps) {{ $sum += $t }}
-        Write-Output ([math]::Round($sum / $allTemps.Count, 1))
+        foreach ($t in $selectedTemps) {{ $sum += $t }}
+        Write-Output ([math]::Round($sum / $selectedTemps.Count, 1))
     }} else {{
         # max 模式：直接取所有传感器最大值
         $maxVal = 0.0
@@ -153,7 +206,7 @@ try {{
 '''
 
 
-def _lhm_read_temperature(temp_mode="max"):
+def _lhm_read_temperature(temp_mode="avg"):
     """读取 CPU 温度（°C）。
     优先级：管理员温度助手文件 → 进程内 pythonnet 直读 → PowerShell 子进程。
     三种方式都失败则返回 None。
@@ -188,7 +241,7 @@ def _lhm_read_temperature(temp_mode="max"):
                     _LHM_STATE["temp_type"] = Hardware.SensorType.Temperature
                 computer = _LHM_STATE["computer"]
                 temp_type = _LHM_STATE["temp_type"]
-                all_temps = []
+                readings = []
                 for hw in computer.Hardware:
                     try:
                         hw.Update()
@@ -203,10 +256,8 @@ def _lhm_read_temperature(temp_mode="max"):
                             continue
                         if not (0 < v < 120):
                             continue
-                        all_temps.append(v)
-                if temp_mode == "avg" and all_temps:
-                    return round(sum(all_temps) / len(all_temps), 1)
-                result = max(all_temps) if all_temps else None
+                        readings.append((str(s.Name), v))
+                result = select_cpu_temperature(readings, temp_mode)
                 if result is not None:
                     return result
             except Exception:
@@ -220,7 +271,7 @@ def _lhm_read_temperature(temp_mode="max"):
     return _lhm_read_temperature_ps(temp_mode)
 
 
-def _lhm_read_temperature_ps(temp_mode="max"):
+def _lhm_read_temperature_ps(temp_mode="avg"):
     """通过 PowerShell 子进程加载 LHM DLL 读取 CPU 温度。
     不依赖 pythonnet，PyInstaller 打包后也能正常工作。
     temp_mode: "max" 取最高温度，"avg" 取平均温度。
@@ -253,7 +304,10 @@ def _lhm_read_temperature_ps(temp_mode="max"):
 # TEMP 下的数据文件；宠物进程（非提权）直接读该文件。宠物进程同时写
 # 心跳文件，宠物退出后心跳超时，助手自动结束，不留驻留进程。
 # ---------------------------------------------------------------------------
-_HELPER_DIR = os.path.join(tempfile.gettempdir(), "eva_pet_helper")
+# v2 isolates the corrected average-sensor helper from a 13.3.1 helper that
+# may still be alive for up to 90 seconds during an in-place upgrade. Reusing
+# the old heartbeat/data paths would keep its obsolete averaging logic alive.
+_HELPER_DIR = os.path.join(tempfile.gettempdir(), "eva_pet_helper_v2")
 _HELPER_MAX_AGE = 15.0  # 数据文件超过该秒数视为过期
 
 
@@ -277,7 +331,7 @@ def write_temp_mode(mode):
     try:
         os.makedirs(_HELPER_DIR, exist_ok=True)
         with open(_helper_mode_path(), "w") as f:
-            f.write("avg" if mode == "avg" else "max")
+            f.write("max" if mode == "max" else "avg")
     except Exception:
         pass
 
@@ -326,7 +380,7 @@ def helper_error():
         return None
 
 
-def _lhm_helper_ps_script(temp_mode="max"):
+def _lhm_helper_ps_script(temp_mode="avg"):
     """生成提权常驻助手的 PowerShell 脚本：循环读取温度写入数据文件。
     temp_mode: "max" 取所有 CPU 温度传感器最大值；"avg" 取平均值。
     """
@@ -344,7 +398,7 @@ def _lhm_helper_ps_script(temp_mode="max"):
     # mode 文件路径：助手每次循环读取该文件，动态切换 max/avg 模式
     mode_file = os.path.join(_HELPER_DIR, "temp_mode.txt").replace("'", "''")
     # 默认模式写死到脚本中作为兜底
-    default_mode = temp_mode if temp_mode in ("max", "avg") else "max"
+    default_mode = temp_mode if temp_mode in ("max", "avg") else "avg"
     return f'''
 $ErrorActionPreference = 'Stop'
 $computer = $null
@@ -405,6 +459,9 @@ try {{
 
         # 收集所有 CPU 温度传感器值
         $allTemps = [System.Collections.Generic.List[double]]::new()
+        $averageTemps = [System.Collections.Generic.List[double]]::new()
+        $coreTemps = [System.Collections.Generic.List[double]]::new()
+        $dieTemps = [System.Collections.Generic.List[double]]::new()
         foreach ($hw in $computer.Hardware) {{
             try {{ $hw.Update() }} catch {{ continue }}
             foreach ($sensor in $hw.Sensors) {{
@@ -412,16 +469,28 @@ try {{
                     $v = $sensor.Value
                     if ($v -ne $null -and $v -gt 0 -and $v -lt 120) {{
                         $allTemps.Add([double]$v)
+                        $name = [string]$sensor.Name
+                        if ($name -ieq 'Core Average' -or $name -ieq 'CCDs Average (Tdie)') {{
+                            $averageTemps.Add([double]$v)
+                        }} elseif ($name -match '^(P-Core #|E-Core #|CPU Core #|Core #)' -and $name -notmatch 'Distance') {{
+                            $coreTemps.Add([double]$v)
+                        }} elseif ($name -ieq 'Core (Tctl/Tdie)' -or $name -ieq 'Core (Tdie)') {{
+                            $dieTemps.Add([double]$v)
+                        }}
                     }}
                 }}
             }}
         }}
         # 按模式计算
         $val = 0.0
-        if ($mode -eq 'avg' -and $allTemps.Count -gt 0) {{
+        $selectedTemps = $allTemps
+        if ($averageTemps.Count -gt 0) {{ $selectedTemps = $averageTemps }}
+        elseif ($coreTemps.Count -gt 0) {{ $selectedTemps = $coreTemps }}
+        elseif ($dieTemps.Count -gt 0) {{ $selectedTemps = $dieTemps }}
+        if ($mode -eq 'avg' -and $selectedTemps.Count -gt 0) {{
             $sum = 0.0
-            foreach ($t in $allTemps) {{ $sum += $t }}
-            $val = [math]::Round($sum / $allTemps.Count, 1)
+            foreach ($t in $selectedTemps) {{ $sum += $t }}
+            $val = [math]::Round($sum / $selectedTemps.Count, 1)
         }} else {{
             # max 模式：直接取所有传感器最大值
             foreach ($t in $allTemps) {{ if ($t -gt $val) {{ $val = $t }} }}
@@ -460,7 +529,7 @@ def is_admin():
         return False
 
 
-def start_elevated_temp_helper(temp_mode="max"):
+def start_elevated_temp_helper(temp_mode="avg"):
     """启动常驻温度读取助手。
     已有管理员权限时直接启动（免 UAC），否则通过 UAC 提权启动。
     temp_mode: "max" 显示最高温度，"avg" 显示平均温度。
@@ -584,7 +653,7 @@ class MetricsCollector:
         # 心跳：供提权温度助手判断宠物进程是否存活
         touch_helper_heartbeat()
         # 温度模式：从设置中读取（max 或 avg）
-        temp_mode = getattr(self.settings, "metricsCpuTempMode", "max")
+        temp_mode = getattr(self.settings, "metricsCpuTempMode", "avg")
         # 优先：LibreHardwareMonitor 直读 SMU（需 PawnIO 驱动）
         value = _lhm_read_temperature(temp_mode)
         self._cpu_temp_value = value

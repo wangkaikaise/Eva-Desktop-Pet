@@ -1028,7 +1028,7 @@ class EvaWindow(QMainWindow):
             from metrics import (start_elevated_temp_helper, helper_status,
                                  write_temp_mode)
             # 写入当前温度模式
-            temp_mode = getattr(self.settings, "metricsCpuTempMode", "max")
+            temp_mode = getattr(self.settings, "metricsCpuTempMode", "avg")
             write_temp_mode(temp_mode)
             status, val = helper_status()
             if status == "alive" and val:
@@ -1103,7 +1103,7 @@ class EvaWindow(QMainWindow):
             )
             if ret != QMessageBox.StandardButton.Yes:
                 return
-            temp_mode = getattr(self.settings, "metricsCpuTempMode", "max")
+            temp_mode = getattr(self.settings, "metricsCpuTempMode", "avg")
             ok, msg = start_elevated_temp_helper(temp_mode)
             if not ok:
                 box = QMessageBox(QMessageBox.Icon.Warning, "启用CPU温度",
@@ -1200,7 +1200,7 @@ class EvaWindow(QMainWindow):
                     and (not old.metricsEnabled or not old.metricsShowCpuTemp)):
                 QTimer.singleShot(1000, self._auto_start_temp_helper)
             # 温度模式变化时动态切换（写 mode 文件，助手下次循环读取）
-            if old is not None and getattr(old, "metricsCpuTempMode", "max") != getattr(self.settings, "metricsCpuTempMode", "max"):
+            if old is not None and getattr(old, "metricsCpuTempMode", "avg") != getattr(self.settings, "metricsCpuTempMode", "avg"):
                 try:
                     from metrics import write_temp_mode, helper_status
                     write_temp_mode(self.settings.metricsCpuTempMode)
@@ -1651,13 +1651,65 @@ class EvaWindow(QMainWindow):
                 if action != PetAction.PLAY and alpha > 0.001
             ]
         total = sum(alpha for _, alpha in eye_layers) or 1.0
-        for action, alpha in eye_layers:
-            self._draw_eye_shape(
-                painter, left_rect, right_rect, action,
-                opacity * (alpha / total),
+        if len(eye_layers) == 2 and all(
+            action != PetAction.PLAY for action, _ in eye_layers
+        ):
+            # Draw exactly one geometry per eye during a transition. Drawing the
+            # outgoing and incoming arcs on top of each other leaves a fading
+            # round cap (dot) and a second short line under one eye on some DPRs.
+            self._draw_interpolated_arc_eyes(
+                painter, left_rect, right_rect, eye_layers, accent, opacity,
             )
+        else:
+            for action, alpha in eye_layers:
+                self._draw_eye_shape(
+                    painter, left_rect, right_rect, action,
+                    opacity * (alpha / total),
+                )
 
         painter.restore()
+
+    def _draw_interpolated_arc_eyes(self, painter, left_rect, right_rect,
+                                    eye_layers, color, opacity):
+        """Morph two arc states without overlapping paths or endpoint ghosts."""
+        (action_a, alpha_a), (action_b, alpha_b) = eye_layers
+        total = max(0.001, alpha_a + alpha_b)
+        wa, wb = alpha_a / total, alpha_b / total
+        height_a, glow_a, opacity_a = self._eye_arc_style(action_a)
+        height_b, glow_b, opacity_b = self._eye_arc_style(action_b)
+        signed_height = height_a * wa + height_b * wb
+        transition_opacity = opacity * (opacity_a * wa + opacity_b * wb)
+
+        # Upward smile -> downward sleep lid would otherwise pass through a
+        # perfectly horizontal stroke. Use a brief soft blink with a minimum
+        # curvature and flip direction only once the target becomes dominant.
+        if height_a * height_b < 0:
+            direction = -1.0 if (height_b < 0 and wb >= 0.5) or (height_a < 0 and wa > 0.5) else 1.0
+            signed_height = direction * max(0.16, abs(signed_height))
+            transition_opacity *= 0.42 + abs(wa - wb) * 0.58
+
+        height = max(0.16, abs(signed_height))
+        glow = glow_a * wa + glow_b * wb
+        curve_down = signed_height < 0
+        for rect in (left_rect, right_rect):
+            self._draw_eye_mac_arc(
+                painter, rect, color, transition_opacity,
+                width=0.22, height=height, glow=glow,
+                curve_down=curve_down,
+            )
+
+    def _eye_arc_style(self, action: PetAction):
+        """Return signed curvature, glow and opacity for non-play eye states."""
+        if action == PetAction.HOVER:
+            return 0.25, 1.0, 1.0
+        if action == PetAction.CHEER:
+            bounce = 0.50 + 0.08 * math.sin(
+                self.state.time * self.state.speed * 2.8
+            )
+            return bounce, 1.10, 1.0
+        if action == PetAction.SLEEP:
+            return -0.36, 0.75, 0.65
+        return 0.34, 1.0, 1.0
 
     def _draw_eye_shape(self, painter: QPainter, left_rect: QRectF, right_rect: QRectF,
                         action: PetAction, opacity: float):
@@ -1695,6 +1747,8 @@ class EvaWindow(QMainWindow):
                           width: float, height: float, glow: float = 1.0, curve_down: bool = False):
         """Mac 风格弧线眼：柔和外光 + 饱满主弧线。
         两层严格对齐同一条路径，避免细窄内芯层形成可见水平亮线。"""
+        painter.save()
+        painter.setBrush(Qt.BrushStyle.NoBrush)
         path = QPainterPath()
         pad = rect.width() * 0.10
         start = QPointF(rect.left() + pad, rect.center().y())
@@ -1717,9 +1771,11 @@ class EvaWindow(QMainWindow):
             pen.setCapStyle(Qt.PenCapStyle.RoundCap)
             painter.setPen(pen)
             painter.drawPath(path)
+        painter.restore()
 
     def _draw_eye_mac_circle(self, painter: QPainter, rect: QRectF, color: QColor, opacity: float, size: float = 1.0):
         """Mac 风格圆眼：玩耍时的圆润兴奋眼，外发光 + 饱满主体 + 内芯提亮 + 高光点。"""
+        painter.save()
         r = min(rect.width(), rect.height()) * 0.38 * size
         cx, cy = rect.center().x(), rect.center().y()
         painter.setPen(Qt.PenStyle.NoPen)
@@ -1736,6 +1792,7 @@ class EvaWindow(QMainWindow):
         # 白色高光点
         painter.setBrush(QColor(255, 255, 255, int(245 * opacity)))
         painter.drawEllipse(QRectF(cx - r * 0.35, cy - r * 0.55, r * 0.40, r * 0.40))
+        painter.restore()
 
     def _draw_sleep_zzz(self, painter: QPainter, rect: QRectF, color: QColor, opacity: float):
         """睡眠时在右眼右下方画一个小 z，远离其他 UI 元素。"""
