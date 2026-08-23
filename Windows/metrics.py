@@ -336,6 +336,7 @@ def _lhm_helper_ps_script(temp_mode="max"):
         return None
     ps_path = dll_path.replace("'", "''")
     vd = vendor_dir.replace("'", "''")
+    setup_path = os.path.join(vendor_dir, "PawnIO_setup.exe").replace("'", "''")
     tf, hb, _, err_path = _helper_paths()
     tf_e = tf.replace("'", "''")
     hb_e = hb.replace("'", "''")
@@ -350,6 +351,27 @@ $computer = $null
 $defaultMode = '{default_mode}'
 $modeFile = '{mode_file}'
 try {{
+    # The helper already runs elevated. Install PawnIO here so a normal
+    # non-admin Eva process never gets stuck before the UAC step.
+    $pawnService = Get-Service -Name 'PawnIO' -ErrorAction SilentlyContinue
+    if ($null -eq $pawnService) {{
+        if (-not (Test-Path '{setup_path}')) {{
+            throw 'PawnIO_setup.exe was not found in the application vendor directory.'
+        }}
+        $installer = Start-Process -FilePath '{setup_path}' `
+            -ArgumentList @('-install', '-silent') -Wait -PassThru -WindowStyle Hidden
+        if ($installer.ExitCode -ne 0 -and $installer.ExitCode -ne 3010) {{
+            throw "PawnIO installation failed with exit code $($installer.ExitCode)."
+        }}
+        for ($i = 0; $i -lt 10; $i++) {{
+            Start-Sleep -Milliseconds 500
+            $pawnService = Get-Service -Name 'PawnIO' -ErrorAction SilentlyContinue
+            if ($null -ne $pawnService) {{ break }}
+        }}
+        if ($null -eq $pawnService) {{
+            throw 'PawnIO was installed but its Windows service is unavailable. A restart may be required.'
+        }}
+    }}
     $deps = @(
         'System.Runtime.CompilerServices.Unsafe',
         'System.Buffers',
@@ -508,8 +530,8 @@ def shutdown_lhm():
 class MetricsCollector:
     """采集 CPU/GPU 性能指标。
     - CPU 占用：psutil
-    - CPU 温度：LibreHardwareMonitor（PawnIO 驱动）直读 SMU 传感器，
-      部分主板 ACPI 也不暴露，失败时回落 WMI，仍失败返回 None
+    - CPU 温度：LibreHardwareMonitor（PawnIO 驱动）直读 SMU/MSR 传感器；
+      首次启用时由独立提权助手安装驱动，主程序始终保持普通权限
     - GPU 占用/温度：nvidia-smi（NVIDIA 显卡）
     """
 

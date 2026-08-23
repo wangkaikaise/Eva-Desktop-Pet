@@ -6,7 +6,7 @@ from PySide6.QtWidgets import (
     QPushButton, QComboBox, QSpinBox, QDoubleSpinBox, QLineEdit,
     QListWidget, QListWidgetItem, QWidget, QGroupBox,
     QMessageBox, QDialogButtonBox, QStackedWidget,
-    QFrame, QAbstractItemView, QScrollArea, QFormLayout
+    QFrame, QAbstractItemView, QScrollArea, QFormLayout, QFontComboBox
 )
 from PySide6.QtCore import (
     Qt, QSize, Signal, Property,
@@ -14,7 +14,7 @@ from PySide6.QtCore import (
 )
 from PySide6.QtGui import QPainter, QColor, QPen, QFont
 
-from settings import PetSettings, PetReminder
+from settings import PetSettings, PetReminder, metrics_font_family
 from state_machine import PetMood, MOOD_TITLES
 
 
@@ -755,11 +755,15 @@ class SettingsDialog(QDialog):
         self.slider_card_content.setRange(25, 100)
         self._form_row(g3, "文字不透明度", self._slider_widget(self.slider_card_content, lambda val: f"{val}%"))
         self._divider(g3)
-        self.combo_font = QComboBox()
-        self.combo_font.addItem("圆润（微软雅黑）", "rounded")
-        self.combo_font.addItem("系统（Segoe UI）", "system")
-        self.combo_font.addItem("等宽（Consolas）", "monospace")
+        self.combo_font = QFontComboBox()
+        self.combo_font.setMinimumWidth(220)
+        self.combo_font.setToolTip("选择 Windows 中已安装的字体，应用后性能卡片会立即更新")
         self._form_row(g3, "字体", self.combo_font)
+        self._divider(g3)
+        self.spin_font_size = QSpinBox()
+        self.spin_font_size.setRange(8, 18)
+        self.spin_font_size.setSuffix(" pt")
+        self._form_row(g3, "字号", self.spin_font_size)
         self._divider(g3)
         self.combo_text_color = QComboBox()
         self.combo_text_color.addItem("白色", "white")
@@ -851,7 +855,8 @@ class SettingsDialog(QDialog):
         self.chk_show_gpu_temp.setChecked(s.metricsShowGpuTemp)
         self.slider_card_bg.setValue(int(s.metricsBackgroundOpacity * 100))
         self.slider_card_content.setValue(int(s.metricsContentOpacity * 100))
-        self.combo_font.setCurrentIndex(self.combo_font.findData(s.metricsFont))
+        self.combo_font.setCurrentFont(QFont(metrics_font_family(s.metricsFont)))
+        self.spin_font_size.setValue(getattr(s, "metricsFontSize", 10))
         self.combo_text_color.setCurrentIndex(self.combo_text_color.findData(s.metricsTextColor))
         self._refresh_reminder_list()
         # 控件变化只标记"有未应用改动"，不直接生效
@@ -868,7 +873,8 @@ class SettingsDialog(QDialog):
             (self.combo_metrics_refresh, "currentIndexChanged"),
             (self.slider_card_bg, "valueChanged"),
             (self.slider_card_content, "valueChanged"),
-            (self.combo_font, "currentIndexChanged"),
+            (self.combo_font, "currentFontChanged"),
+            (self.spin_font_size, "valueChanged"),
             (self.combo_text_color, "currentIndexChanged"),
         ]
         for widget, signal in conns:
@@ -913,7 +919,8 @@ class SettingsDialog(QDialog):
         s.metricsShowGpuTemp = self.chk_show_gpu_temp.isChecked()
         s.metricsBackgroundOpacity = self.slider_card_bg.value() / 100.0
         s.metricsContentOpacity = self.slider_card_content.value() / 100.0
-        s.metricsFont = self.combo_font.currentData()
+        s.metricsFont = self.combo_font.currentFont().family()
+        s.metricsFontSize = self.spin_font_size.value()
         s.metricsTextColor = self.combo_text_color.currentData()
         s.clamp()
 

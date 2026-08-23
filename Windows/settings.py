@@ -4,6 +4,19 @@ from dataclasses import dataclass, asdict
 from typing import List
 
 
+_LEGACY_METRICS_FONTS = {
+    "rounded": "Microsoft YaHei UI",
+    "system": "Segoe UI",
+    "monospace": "Consolas",
+}
+
+
+def metrics_font_family(value: str) -> str:
+    """Return a real font family, migrating the three legacy preset tokens."""
+    value = str(value or "").strip()
+    return _LEGACY_METRICS_FONTS.get(value, value or "Microsoft YaHei UI")
+
+
 @dataclass
 class PetReminder:
     id: str = ""
@@ -46,7 +59,8 @@ class PetSettings:
     metricsShowGpuTemp: bool = True
     metricsBackgroundOpacity: float = 0.28
     metricsContentOpacity: float = 1.0
-    metricsFont: str = "rounded"  # rounded, system, monospace
+    metricsFont: str = "Microsoft YaHei UI"
+    metricsFontSize: int = 10
     metricsTextColor: str = "white"  # white, blue, black
     language: str = "zh"
 
@@ -59,6 +73,8 @@ class PetSettings:
         self.metricsRefreshSeconds = 5 if self.metricsRefreshSeconds not in (2, 5, 10) else self.metricsRefreshSeconds
         self.metricsBackgroundOpacity = max(0.0, min(0.75, self.metricsBackgroundOpacity))
         self.metricsContentOpacity = max(0.25, min(1.0, self.metricsContentOpacity))
+        self.metricsFont = metrics_font_family(self.metricsFont)
+        self.metricsFontSize = max(8, min(18, int(self.metricsFontSize)))
 
     def to_dict(self):
         return asdict(self)
